@@ -4,3 +4,637 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PDFDesk – AI-Powered PDF Data Extraction</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet" />
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    * { font-family: 'Inter', sans-serif; }
+    .drag-over { border-color: #3b82f6 !important; background-color: #eff6ff !important; }
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+    .shimmer {
+      background: linear-gradient(90deg, #e2e8f0 25%, #f8fafc 50%, #e2e8f0 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .fade-in { animation: fadeIn 0.3s ease-out forwards; }
+    .progress-bar-inner {
+      transition: width 0.4s ease;
+    }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+  </style>
+</head>
+<body class="bg-gray-50">
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useRef, useEffect, useCallback } = React;
+
+// ─── Icons (inline SVG) ────────────────────────────────────────────────────
+const Icon = ({ name, cls = "w-5 h-5" }) => {
+  const icons = {
+    upload: <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>,
+    history: <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+    template: <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
+    integration: <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>,
+    billing: <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>,
+    file: <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>,
+    check: <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+    download: <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>,
+    logo: <svg className={cls} viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="8" fill="#2563eb"/><path d="M8 9h10l6 6v8H8V9z" fill="white" opacity="0.2"/><path d="M8 9h10l6 6v8H8V9z" stroke="white" strokeWidth="1.5" strokeLinejoin="round"/><path d="M18 9v6h6" stroke="white" strokeWidth="1.5" strokeLinejoin="round"/><path d="M11 16h10M11 19h7" stroke="white" strokeWidth="1.5" strokeLinecap="round"/><circle cx="22" cy="22" r="6" fill="#10b981"/><path d="M19.5 22l1.5 1.5 3-3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+    menu: <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>,
+    x: <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
+    spark: <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3l14 9-14 9V3z" /></svg>,
+  };
+  return icons[name] || null;
+};
+
+// ─── Extracted data (mock) ────────────────────────────────────────────────
+const MOCK_EXTRACTED = [
+  { field: "Vendor Name", value: "Acme Corp Ltd.", confidence: 98 },
+  { field: "Invoice Number", value: "INV-2024-00847", confidence: 99 },
+  { field: "Invoice Date", value: "April 15, 2024", confidence: 97 },
+  { field: "Due Date", value: "May 15, 2024", confidence: 96 },
+  { field: "Line Item 1", value: "Professional Services – $1,200.00", confidence: 94 },
+  { field: "Line Item 2", value: "Software License – $350.00", confidence: 93 },
+  { field: "Subtotal", value: "$1,550.00", confidence: 99 },
+  { field: "Tax (7%)", value: "$108.50", confidence: 98 },
+  { field: "Total Amount", value: "$1,658.50", confidence: 99 },
+  { field: "Payment Terms", value: "Net 30", confidence: 95 },
+  { field: "Bank Account", value: "XXXX-XXXX-4521", confidence: 88 },
+];
+
+// ─── Document History data ────────────────────────────────────────────────
+const HISTORY = [
+  { name: "invoice_acme_april.pdf", date: "May 9, 2026", pages: 3, fields: 11, status: "Processed" },
+  { name: "receipt_starbucks_0501.pdf", date: "May 8, 2026", pages: 1, fields: 7, status: "Processed" },
+  { name: "contract_nda_client.pdf", date: "May 7, 2026", pages: 8, fields: 14, status: "Processed" },
+  { name: "medical_form_2026.pdf", date: "May 6, 2026", pages: 4, fields: 18, status: "Pending" },
+  { name: "invoice_supplier_q1.pdf", date: "May 5, 2026", pages: 2, fields: 0, status: "Failed" },
+  { name: "receipt_amazon_0430.pdf", date: "Apr 30, 2026", pages: 1, fields: 8, status: "Processed" },
+  { name: "contract_saas_annual.pdf", date: "Apr 28, 2026", pages: 12, fields: 16, status: "Processed" },
+];
+
+// ─── Templates ────────────────────────────────────────────────────────────
+const TEMPLATES = [
+  {
+    name: "Invoice",
+    icon: "💼",
+    color: "blue",
+    desc: "Extract key billing fields from vendor invoices",
+    fields: ["Vendor Name", "Invoice #", "Invoice Date", "Due Date", "Line Items", "Subtotal", "Tax", "Total Amount", "Payment Terms"],
+  },
+  {
+    name: "Receipt",
+    icon: "🧾",
+    color: "green",
+    desc: "Capture transaction details from receipts",
+    fields: ["Merchant Name", "Date", "Items Purchased", "Subtotal", "Tax", "Total", "Payment Method"],
+  },
+  {
+    name: "Contract",
+    icon: "📋",
+    color: "purple",
+    desc: "Extract parties, dates, and key terms from contracts",
+    fields: ["Party A", "Party B", "Effective Date", "Expiry Date", "Governing Law", "Payment Terms", "Termination Clause", "Confidentiality"],
+  },
+  {
+    name: "Medical Form",
+    icon: "🏥",
+    color: "red",
+    desc: "Extract patient and clinical data from medical forms",
+    fields: ["Patient Name", "DOB", "Diagnosis", "Physician", "Date of Visit", "Medications", "Allergies", "Insurance ID", "Claim #"],
+  },
+];
+
+// ─── Integrations ─────────────────────────────────────────────────────────
+const INTEGRATIONS_DATA = [
+  { name: "QuickBooks", logo: "📊", desc: "Sync extracted invoices directly to QuickBooks", color: "green" },
+  { name: "Xero", logo: "💹", desc: "Push extracted data to your Xero accounting", color: "blue" },
+  { name: "Salesforce", logo: "☁️", desc: "Create Salesforce records from PDF forms", color: "indigo" },
+  { name: "HubSpot", logo: "🟠", desc: "Import contract data into HubSpot CRM", color: "orange" },
+  { name: "Zapier", logo: "⚡", desc: "Automate workflows with 5,000+ apps via Zapier", color: "yellow" },
+];
+
+// ─── Upload / Extract Screen ──────────────────────────────────────────────
+function UploadScreen() {
+  const [phase, setPhase] = useState("idle"); // idle | uploading | done
+  const [progress, setProgress] = useState(0);
+  const [statusMsg, setStatusMsg] = useState("");
+  const [fileName, setFileName] = useState("");
+  const [dragOver, setDragOver] = useState(false);
+  const fileRef = useRef();
+
+  const runExtraction = (name) => {
+    setFileName(name);
+    setPhase("uploading");
+    const steps = [
+      { pct: 20, msg: "Uploading document..." },
+      { pct: 45, msg: "Analyzing document structure..." },
+      { pct: 70, msg: "Extracting fields with AI..." },
+      { pct: 90, msg: "Validating extracted data..." },
+      { pct: 100, msg: "Complete!" },
+    ];
+    let i = 0;
+    const tick = () => {
+      if (i < steps.length) {
+        setProgress(steps[i].pct);
+        setStatusMsg(steps[i].msg);
+        i++;
+        setTimeout(tick, 700);
+      } else {
+        setTimeout(() => setPhase("done"), 400);
+      }
+    };
+    tick();
+  };
+
+  const handleFile = (file) => {
+    if (file && file.type === "application/pdf") {
+      runExtraction(file.name);
+    } else {
+      alert("Please upload a PDF file.");
+    }
+  };
+
+  const downloadCSV = () => {
+    const header = "Field Name,Extracted Value,Confidence (%)\n";
+    const rows = MOCK_EXTRACTED.map(r => `"${r.field}","${r.value}",${r.confidence}`).join("\n");
+    const blob = new Blob([header + rows], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${fileName.replace(".pdf", "") || "extracted_data"}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const confColor = (v) => v >= 95 ? "text-green-600 bg-green-50" : v >= 85 ? "text-yellow-600 bg-yellow-50" : "text-red-600 bg-red-50";
+
+  if (phase === "done") return (
+    <div className="fade-in">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Extraction Complete</h1>
+          <p className="text-gray-500 mt-1 flex items-center gap-1"><Icon name="file" cls="w-4 h-4" />{fileName}</p>
+        </div>
+        <div className="flex gap-3">
+          <button onClick={() => { setPhase("idle"); setProgress(0); setFileName(""); }} className="px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition">
+            Upload Another
+          </button>
+          <button onClick={downloadCSV} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition shadow-sm">
+            <Icon name="download" cls="w-4 h-4" /> Download CSV
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <span className="font-semibold text-gray-800">Extracted Fields</span>
+          <span className="text-sm text-gray-400">{MOCK_EXTRACTED.length} fields found</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
+                <th className="text-left px-6 py-3">Field Name</th>
+                <th className="text-left px-6 py-3">Extracted Value</th>
+                <th className="text-right px-6 py-3">Confidence</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {MOCK_EXTRACTED.map((row, i) => (
+                <tr key={i} className="hover:bg-blue-50 transition-colors">
+                  <td className="px-6 py-3.5 font-medium text-gray-700">{row.field}</td>
+                  <td className="px-6 py-3.5 text-gray-600 font-mono text-xs">{row.value}</td>
+                  <td className="px-6 py-3.5 text-right">
+                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${confColor(row.confidence)}`}>{row.confidence}%</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (phase === "uploading") return (
+    <div className="flex flex-col items-center justify-center min-h-96 gap-8">
+      <div className="text-center">
+        <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <Icon name="spark" cls="w-8 h-8 text-blue-600" />
+        </div>
+        <h2 className="text-xl font-bold text-gray-900 mb-1">Processing Document</h2>
+        <p className="text-gray-500 text-sm">{fileName}</p>
+      </div>
+      <div className="w-full max-w-md">
+        <div className="flex justify-between text-sm text-gray-500 mb-2">
+          <span>{statusMsg}</span>
+          <span>{progress}%</span>
+        </div>
+        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+          <div className="h-full bg-blue-600 rounded-full progress-bar-inner" style={{ width: `${progress}%` }} />
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-4 w-full max-w-md">
+        {["Upload", "Analyze", "Extract"].map((s, i) => (
+          <div key={s} className={`text-center p-3 rounded-xl border ${progress > i * 33 ? "border-blue-200 bg-blue-50" : "border-gray-100 bg-white"}`}>
+            <div className={`w-6 h-6 rounded-full mx-auto mb-1 flex items-center justify-center ${progress > i * 33 ? "bg-blue-600" : "bg-gray-200"}`}>
+              {progress > i * 33 ? <Icon name="check" cls="w-3 h-3 text-white" /> : <span className="text-xs text-gray-400">{i + 1}</span>}
+            </div>
+            <p className={`text-xs font-medium ${progress > i * 33 ? "text-blue-700" : "text-gray-400"}`}>{s}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  return (
+    <div>
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-gray-900">Upload & Extract</h1>
+        <p className="text-gray-500 mt-1">Upload a PDF and our AI will extract all key fields automatically.</p>
+      </div>
+      <div
+        className={`border-2 border-dashed rounded-2xl p-16 text-center cursor-pointer transition-all ${dragOver ? "border-blue-400 bg-blue-50" : "border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50"}`}
+        onClick={() => fileRef.current.click()}
+        onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={e => { e.preventDefault(); setDragOver(false); handleFile(e.dataTransfer.files[0]); }}
+      >
+        <input ref={fileRef} type="file" accept=".pdf" className="hidden" onChange={e => handleFile(e.target.files[0])} />
+        <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <Icon name="upload" cls="w-8 h-8 text-blue-600" />
+        </div>
+        <h3 className="text-lg font-semibold text-gray-800 mb-2">Drop your PDF here</h3>
+        <p className="text-gray-500 text-sm mb-4">or click to browse files</p>
+        <span className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition">Select PDF</span>
+        <p className="text-xs text-gray-400 mt-4">Supports PDF up to 50 pages · Max 25 MB</p>
+      </div>
+
+      <div className="mt-6 grid grid-cols-3 gap-4">
+        {[["98%", "Avg. Accuracy", "🎯"], ["< 3s", "Extraction Time", "⚡"], ["50+", "Field Types", "🔍"]].map(([val, label, emoji]) => (
+          <div key={label} className="bg-white rounded-xl p-4 border border-gray-100 text-center">
+            <div className="text-2xl mb-1">{emoji}</div>
+            <div className="text-xl font-bold text-gray-900">{val}</div>
+            <div className="text-xs text-gray-500">{label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-6 bg-white rounded-2xl border border-gray-100 p-5">
+        <p className="text-sm font-semibold text-gray-700 mb-3">Try a demo extraction →</p>
+        <div className="flex gap-3 flex-wrap">
+          {["sample_invoice.pdf", "receipt_starbucks.pdf", "contract_nda.pdf"].map(f => (
+            <button key={f} onClick={() => runExtraction(f)}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition">
+              <Icon name="file" cls="w-4 h-4" />{f}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── History Screen ───────────────────────────────────────────────────────
+function HistoryScreen() {
+  const badgeStyle = (s) => s === "Processed" ? "bg-green-100 text-green-700" : s === "Pending" ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700";
+  return (
+    <div className="fade-in">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Document History</h1>
+          <p className="text-gray-500 mt-1">All previously processed documents</p>
+        </div>
+        <span className="text-sm text-gray-400">{HISTORY.length} documents</span>
+      </div>
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
+                <th className="text-left px-6 py-3">File Name</th>
+                <th className="text-left px-6 py-3 hidden sm:table-cell">Date Processed</th>
+                <th className="text-center px-6 py-3 hidden md:table-cell">Pages</th>
+                <th className="text-center px-6 py-3 hidden md:table-cell">Fields</th>
+                <th className="text-center px-6 py-3">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {HISTORY.map((doc, i) => (
+                <tr key={i} className="hover:bg-blue-50 transition-colors cursor-pointer">
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-red-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <Icon name="file" cls="w-4 h-4 text-red-500" />
+                      </div>
+                      <span className="font-medium text-gray-800 truncate max-w-xs">{doc.name}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-gray-500 hidden sm:table-cell">{doc.date}</td>
+                  <td className="px-6 py-4 text-center text-gray-500 hidden md:table-cell">{doc.pages}</td>
+                  <td className="px-6 py-4 text-center text-gray-500 hidden md:table-cell">{doc.fields}</td>
+                  <td className="px-6 py-4 text-center">
+                    <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold ${badgeStyle(doc.status)}`}>{doc.status}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Templates Screen ─────────────────────────────────────────────────────
+function TemplatesScreen() {
+  const colorMap = {
+    blue: { bg: "bg-blue-50", text: "text-blue-700", badge: "bg-blue-100 text-blue-600", btn: "bg-blue-600 hover:bg-blue-700" },
+    green: { bg: "bg-green-50", text: "text-green-700", badge: "bg-green-100 text-green-600", btn: "bg-green-600 hover:bg-green-700" },
+    purple: { bg: "bg-purple-50", text: "text-purple-700", badge: "bg-purple-100 text-purple-600", btn: "bg-purple-600 hover:bg-purple-700" },
+    red: { bg: "bg-red-50", text: "text-red-700", badge: "bg-red-100 text-red-600", btn: "bg-red-600 hover:bg-red-700" },
+  };
+  return (
+    <div className="fade-in">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Extraction Templates</h1>
+        <p className="text-gray-500 mt-1">Pre-built templates for common document types</p>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {TEMPLATES.map((t) => {
+          const c = colorMap[t.color];
+          return (
+            <div key={t.name} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+              <div className={`${c.bg} px-6 py-5`}>
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="text-3xl">{t.icon}</span>
+                  <div>
+                    <h3 className={`text-lg font-bold ${c.text}`}>{t.name}</h3>
+                    <p className="text-gray-500 text-sm">{t.desc}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="px-6 py-4">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Extracted Fields</p>
+                <div className="flex flex-wrap gap-2">
+                  {t.fields.map(f => (
+                    <span key={f} className={`px-2.5 py-1 rounded-full text-xs font-medium ${c.badge}`}>{f}</span>
+                  ))}
+                </div>
+                <button className={`mt-4 w-full py-2 rounded-lg text-white text-sm font-medium transition ${c.btn}`}>
+                  Use Template
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Integrations Screen ──────────────────────────────────────────────────
+function IntegrationsScreen() {
+  const [connected, setConnected] = useState({});
+  const colorMap = {
+    green: "border-green-200 bg-green-50",
+    blue: "border-blue-200 bg-blue-50",
+    indigo: "border-indigo-200 bg-indigo-50",
+    orange: "border-orange-200 bg-orange-50",
+    yellow: "border-yellow-200 bg-yellow-50",
+  };
+  return (
+    <div className="fade-in">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Integrations</h1>
+        <p className="text-gray-500 mt-1">Connect PDFDesk to your favourite tools</p>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {INTEGRATIONS_DATA.map((int) => {
+          const isConn = connected[int.name];
+          return (
+            <div key={int.name} className={`bg-white rounded-2xl border-2 shadow-sm transition-all ${isConn ? colorMap[int.color] : "border-gray-100"} p-6`}>
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="text-4xl">{int.logo}</div>
+                  <div>
+                    <h3 className="font-bold text-gray-800 text-lg">{int.name}</h3>
+                    <p className="text-gray-500 text-sm">{int.desc}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-4 flex items-center justify-between">
+                {isConn && (
+                  <div className="flex items-center gap-1.5 text-green-600 text-sm font-medium">
+                    <Icon name="check" cls="w-4 h-4" /> Connected
+                  </div>
+                )}
+                {!isConn && <div />}
+                <button
+                  onClick={() => setConnected(c => ({ ...c, [int.name]: !c[int.name] }))}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition ${isConn ? "bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-600" : "bg-blue-600 text-white hover:bg-blue-700"}`}>
+                  {isConn ? "Disconnect" : "Connect"}
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Billing Screen ───────────────────────────────────────────────────────
+function BillingScreen() {
+  const [current, setCurrent] = useState("Pro");
+  const plans = [
+    { name: "Free", price: "$0", period: "/mo", docs: 50, features: ["50 docs/month", "5 templates", "Email export", "Community support"], color: "gray" },
+    { name: "Pro", price: "$49", period: "/mo", docs: 500, features: ["500 docs/month", "All templates", "CSV, JSON, Excel export", "API access", "Priority support"], color: "blue", popular: true },
+    { name: "Enterprise", price: "Custom", period: "", docs: 99999, features: ["Unlimited docs", "Custom templates", "All integrations", "SSO & SAML", "Dedicated support", "SLA guarantee"], color: "purple" },
+  ];
+  const usage = { used: 187, total: 500 };
+
+  return (
+    <div className="fade-in">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Billing & Plans</h1>
+        <p className="text-gray-500 mt-1">Manage your subscription and usage</p>
+      </div>
+
+      {/* Usage card */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <p className="text-sm font-semibold text-gray-700">Current Usage · <span className="text-blue-600">Pro Plan</span></p>
+            <p className="text-2xl font-bold text-gray-900 mt-1">{usage.used} <span className="text-gray-400 text-base font-normal">/ {usage.total} docs</span></p>
+          </div>
+          <div className="text-right">
+            <p className="text-sm text-gray-500">Resets in</p>
+            <p className="text-lg font-bold text-gray-800">21 days</p>
+          </div>
+        </div>
+        <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+          <div className="h-full bg-blue-600 rounded-full progress-bar-inner" style={{ width: `${(usage.used / usage.total) * 100}%` }} />
+        </div>
+        <p className="text-xs text-gray-400 mt-2">{usage.used} of {usage.total} documents used this month ({Math.round((usage.used / usage.total) * 100)}%)</p>
+      </div>
+
+      {/* Pricing table */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        {plans.map((plan) => {
+          const isCurrent = current === plan.name;
+          return (
+            <div key={plan.name} className={`bg-white rounded-2xl border-2 shadow-sm transition-all relative ${isCurrent ? "border-blue-500 shadow-blue-100" : "border-gray-100 hover:border-blue-200"} p-6`}>
+              {plan.popular && (
+                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                  <span className="bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full">MOST POPULAR</span>
+                </div>
+              )}
+              {isCurrent && (
+                <div className="absolute -top-3 right-4">
+                  <span className="bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full">CURRENT PLAN</span>
+                </div>
+              )}
+              <div className="mb-4">
+                <h3 className="text-lg font-bold text-gray-800">{plan.name}</h3>
+                <div className="flex items-end gap-1 mt-2">
+                  <span className="text-3xl font-extrabold text-gray-900">{plan.price}</span>
+                  <span className="text-gray-400 text-sm pb-1">{plan.period}</span>
+                </div>
+              </div>
+              <ul className="space-y-2 mb-6">
+                {plan.features.map(f => (
+                  <li key={f} className="flex items-center gap-2 text-sm text-gray-600">
+                    <Icon name="check" cls="w-4 h-4 text-green-500 flex-shrink-0" />{f}
+                  </li>
+                ))}
+              </ul>
+              <button
+                onClick={() => setCurrent(plan.name)}
+                className={`w-full py-2.5 rounded-lg text-sm font-semibold transition ${isCurrent ? "bg-gray-100 text-gray-500 cursor-default" : plan.name === "Enterprise" ? "bg-purple-600 text-white hover:bg-purple-700" : "bg-blue-600 text-white hover:bg-blue-700"}`}>
+                {isCurrent ? "Current Plan" : plan.name === "Enterprise" ? "Contact Sales" : `Upgrade to ${plan.name}`}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── App Shell ────────────────────────────────────────────────────────────
+const NAV = [
+  { id: "upload", label: "Upload & Extract", icon: "upload" },
+  { id: "history", label: "Document History", icon: "history" },
+  { id: "templates", label: "Templates", icon: "template" },
+  { id: "integrations", label: "Integrations", icon: "integration" },
+  { id: "billing", label: "Billing", icon: "billing" },
+];
+
+export default function App() {
+  const [active, setActive] = useState("upload");
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const screens = { upload: UploadScreen, history: HistoryScreen, templates: TemplatesScreen, integrations: IntegrationsScreen, billing: BillingScreen };
+  const Screen = screens[active];
+
+  const navClick = (id) => { setActive(id); setMenuOpen(false); };
+
+  return (
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
+      {/* Sidebar — desktop */}
+      <aside className="hidden lg:flex flex-col w-64 bg-white border-r border-gray-100 h-full">
+        <div className="px-6 py-5 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <Icon name="logo" cls="w-9 h-9" />
+            <div>
+              <h1 className="font-extrabold text-gray-900 leading-none">PDFDesk</h1>
+              <p className="text-xs text-gray-400">AI Extraction Suite</p>
+            </div>
+          </div>
+        </div>
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+          {NAV.map(n => (
+            <button key={n.id} onClick={() => navClick(n.id)}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${active === n.id ? "bg-blue-600 text-white shadow-sm" : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"}`}>
+              <Icon name={n.icon} cls="w-5 h-5 flex-shrink-0" />
+              {n.label}
+            </button>
+          ))}
+        </nav>
+        <div className="px-4 py-4 border-t border-gray-100">
+          <div className="flex items-center gap-3 px-2">
+            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold">M</div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-gray-800 truncate">Mike Payne</p>
+              <p className="text-xs text-gray-400 truncate">Pro Plan</p>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* Mobile header */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Icon name="logo" cls="w-8 h-8" />
+          <span className="font-extrabold text-gray-900">PDFDesk</span>
+        </div>
+        <button onClick={() => setMenuOpen(!menuOpen)} className="p-2 rounded-lg text-gray-500 hover:bg-gray-100">
+          <Icon name={menuOpen ? "x" : "menu"} cls="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* Mobile menu overlay */}
+      {menuOpen && (
+        <div className="lg:hidden fixed inset-0 z-30 bg-black bg-opacity-40" onClick={() => setMenuOpen(false)}>
+          <div className="absolute top-14 left-0 right-0 bg-white border-b border-gray-100 shadow-lg" onClick={e => e.stopPropagation()}>
+            {NAV.map(n => (
+              <button key={n.id} onClick={() => navClick(n.id)}
+                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium border-b border-gray-50 ${active === n.id ? "bg-blue-50 text-blue-700" : "text-gray-600"}`}>
+                <Icon name={n.icon} cls="w-5 h-5" />{n.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Main content */}
+      <main className="flex-1 overflow-y-auto">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-8 pt-20 lg:pt-8">
+          <Screen key={active} />
+        </div>
+      </main>
+
+      {/* Bottom nav — mobile */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 z-20">
+        <div className="flex">
+          {NAV.map(n => (
+            <button key={n.id} onClick={() => navClick(n.id)}
+              className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs font-medium transition-colors ${active === n.id ? "text-blue-600" : "text-gray-400"}`}>
+              <Icon name={n.icon} cls={`w-5 h-5 ${active === n.id ? "text-blue-600" : "text-gray-400"}`} />
+              <span className="truncate">{n.label.split(" ")[0]}</span>
+            </button>
+          ))}
+        </div>
+      </nav>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App />);
+</script>
+</body>
+</html>
