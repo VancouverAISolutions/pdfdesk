@@ -36,7 +36,7 @@
 </head>
 <body class="bg-gray-50">
 <div id="root"></div>
-<script type="text/babel">
+<script type="text/babel" data-presets="react">
 const { useState, useRef, useEffect, useCallback } = React;
 
 // ─── Icons (inline SVG) ────────────────────────────────────────────────────
@@ -307,7 +307,7 @@ function UploadScreen() {
   );
 }
 
-// ─── History Screen ───────────────────────────────────────────────────────
+// ─── History Screen ──────────────────────────────────────────────────────
 function HistoryScreen() {
   const badgeStyle = (s) => s === "Processed" ? "bg-green-100 text-green-700" : s === "Pending" ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700";
   return (
@@ -373,7 +373,7 @@ function TemplatesScreen() {
         <p className="text-gray-500 mt-1">Pre-built templates for common document types</p>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {TEMPLATES.map((t) => {
+        {TEMPLATEQ.map((t) => {
           const c = colorMap[t.color];
           return (
             <div key={t.name} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
@@ -445,7 +445,7 @@ function IntegrationsScreen() {
                 <button
                   onClick={() => setConnected(c => ({ ...c, [int.name]: !c[int.name] }))}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition ${isConn ? "bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-600" : "bg-blue-600 text-white hover:bg-blue-700"}`}>
-                  {isConn ? "Disconnect" : "Connect"}
+                 {isConn ? "Disconnect" : "Connect"}
                 </button>
               </div>
             </div>
@@ -491,7 +491,7 @@ function BillingScreen() {
         <p className="text-xs text-gray-400 mt-2">{usage.used} of {usage.total} documents used this month ({Math.round((usage.used / usage.total) * 100)}%)</p>
       </div>
 
-      {/* Pricing table */}
+      {/* Priceing table */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {plans.map((plan) => {
           const isCurrent = current === plan.name;
@@ -543,7 +543,7 @@ const NAV = [
   { id: "billing", label: "Billing", icon: "billing" },
 ];
 
-export default function App() {
+function App() {
   const [active, setActive] = useState("upload");
   const [menuOpen, setMenuOpen] = useState(false);
 
